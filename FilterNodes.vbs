@@ -22,11 +22,11 @@ ReDim sarrID(0)
 
 Sub firstRun()
 	
-	SDB.IniFile.BoolValue("FilterNodes_MM"&Round(SDB.VersionHi),"startupCheck") = True
 	SDB.IniFile.BoolValue("FilterNodes_MM"&Round(SDB.VersionHi),"hideLibrary") = True
 	SDB.IniFile.BoolValue("FilterNodes_MM"&Round(SDB.VersionHi),"keywords") = True
 	SDB.IniFile.BoolValue("FilterNodes_MM"&Round(SDB.VersionHi),"altIcons") = True
 	SDB.IniFile.BoolValue("FilterNodes_MM"&Round(SDB.VersionHi),"expPlaylist") = True
+	SDB.IniFile.BoolValue("FilterNodes_MM"&Round(SDB.VersionHi),"expMainNodes") = True
 	SDB.IniFile.BoolValue("FilterNodes_MM"&Round(SDB.VersionHi),"expMainNodes") = True
 	
 	OnStartup()
@@ -34,6 +34,7 @@ End Sub
  
 Sub OnStartup()
   Dim Tree : Set Tree = SDB.MainTree
+  SDB.IniFile.StringValue("FilterNodes_MM"&Round(SDB.VersionHi),"prevTime") = 1
 
   'Dim podcasts
   'Set podcasts = Tree.Node_Playlists.NextSiblingNode
@@ -59,14 +60,13 @@ Sub OnStartup()
   End If
   
   'calculate Nodes
-  If SDB.IniFile.BoolValue("FilterNodes_MM"&Round(SDB.VersionHi),"startupCheck") = True Then
-  	calculateNodes
-  End If
+  calculateNodes
   
   'Create Options Sheet
   Dim aSheet : aSheet = SDB.UI.AddOptionSheet( "Filter Nodes Settings", Script.ScriptPath, "InitSheet", "", 0)
   
   initNodes
+
 
 End Sub
 
@@ -250,19 +250,19 @@ End Sub
 
 
 Sub fillMainNode(theNode)
+
+	'Make sure an infinite loop of selection doesn't occur
+	Dim prevTime : prevTime = SDB.IniFile.StringValue("FilterNodes_MM"&Round(SDB.VersionHi),"prevTime")*1
+	Dim curTime : curTime = Timer()
+	If SDB.IniFile.StringValue("FilterNodes_MM"&Round(SDB.VersionHi),"prevNodeCaption") = theNode.Caption Then
+		If (curTime - prevTime) < 1 Then
+			Exit Sub
+		End If
+	End If
+	SDB.IniFile.StringValue("FilterNodes_MM"&Round(SDB.VersionHi),"prevTime") = curTime
+	SDB.IniFile.StringValue("FilterNodes_MM"&Round(SDB.VersionHi),"prevNodeCaption") = theNode.Caption
 	
-	'This is an attempt to error protect the Tree.CurrentNode = Sel Line, but it treats it like a local variable for some reason
-	'If sblnNewNode Then
-	'	MsgBox(sblnNewNode)
-	'	sblnNewNode = False
-	'	MsgBox(sblnNewNode)
-	'Else
-	'	MsgBox("Second")
-	'	sblnNewNode = True
-	'	Exit Sub
-	'End If
-	
-	
+
 	Dim Tree : Set Tree = SDB.MainTree
 	Dim Trcks : Set Trcks = SDB.MainTracksWindow
 	Dim query, k, Sel, SQL, Order
@@ -272,6 +272,9 @@ Sub fillMainNode(theNode)
 			'Change filter & reselect node (this causes an infinite loop if a dialog appears during)
 			Set Sel = Tree.CurrentNode
   			SDB.Database.ActiveFilterID = SDB.IniFile.StringValue("FilterNodes-Nodes_MM"&Round(SDB.VersionHi),"Node"&k&"ID")
+  			
+  			Tree.CurrentNode = Sel
+			SDB.ProcessMessages
   			
   			query = SDB.Database.GetFilterQuery(SDB.IniFile.StringValue("FilterNodes-Nodes_MM"&Round(SDB.VersionHi),"Node"&k&"ID"))
   			
@@ -301,9 +304,6 @@ Sub fillMainNode(theNode)
 			End If
 				
 			Trcks.FinishAdding
-			
-			Tree.CurrentNode = Sel
-  			SDB.ProcessMessages
   			
 			Exit Sub
 			
@@ -317,14 +317,17 @@ End Sub
 
 Sub fillSubNode(theNode)
 	
-	'If sblnNewNode Then
-	'	MsgBox("First")
-	'	sblnNewNode = False
-	'Else
-	'	MsgBox("Second")
-	'	sblnNewNode = True
-	'	Exit Sub
-	'End If
+	'Make sure an infinite loop of selection doesn't occur
+	Dim prevTime : prevTime = SDB.IniFile.StringValue("FilterNodes_MM"&Round(SDB.VersionHi),"prevTime")*1
+	Dim curTime : curTime = Timer()
+	If SDB.IniFile.StringValue("FilterNodes_MM"&Round(SDB.VersionHi),"prevNodeCaption") = theNode.Caption Then
+		If (curTime - prevTime) < 1 Then
+			Exit Sub
+		End If
+	End If
+	SDB.IniFile.StringValue("FilterNodes_MM"&Round(SDB.VersionHi),"prevTime") = curTime
+	SDB.IniFile.StringValue("FilterNodes_MM"&Round(SDB.VersionHi),"prevNodeCaption") = theNode.Caption
+	
 	
 	Dim Tree : Set Tree = SDB.MainTree
 	Dim Trcks : Set Trcks = SDB.MainTracksWindow
@@ -344,6 +347,9 @@ Sub fillSubNode(theNode)
 					'Change filter & reselect node (this causes an infinite loop if a dialog appears during)
 					Set Sel = Tree.CurrentNode
 					SDB.Database.ActiveFilterID = SDB.IniFile.StringValue("FilterNodes-Nodes_MM"&Round(SDB.VersionHi),"Node"&k&"ID")
+					
+					Tree.CurrentNode = Sel
+		  			SDB.ProcessMessages
   			
 		  			query = SDB.Database.GetFilterQuery(SDB.IniFile.StringValue("FilterNodes-Nodes_MM"&Round(SDB.VersionHi),"Node"&k&"ID"))
   					
@@ -376,8 +382,9 @@ Sub fillSubNode(theNode)
 					'setting the selection back at this point doesn't run the fillSubNode function for some reason
 					'which is handy for this situaion but keep an eye on it because if it starts doing it in the furtue it will cause an infinite loop
 					' it already causes an infinite loop if a msgbox pops up here (eg, error with query)
-		  			Tree.CurrentNode = Sel
-		  			SDB.ProcessMessages
+					' These have now been moved higher and given infinite loop protection
+		  			'Tree.CurrentNode = Sel
+		  			'SDB.ProcessMessages
 		  			
 					Exit Sub
 					
